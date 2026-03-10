@@ -3,20 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    
     <title>AI Car Companion - Ultimate Edition</title>
     <style>
         :root { --bg: #000; --white: #fff; --red: #ff4747; --blue: #77b5fe; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: manipulation; }
+        
+        #container { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 500px; }
         
         #stage { position: relative; width: 320px; height: 400px; display: flex; align-items: center; justify-content: center; transition: transform 0.1s linear; }
         .face { display: none; flex-direction: column; align-items: center; }
         .active { display: flex; }
 
+        /* Navigation Arrows */
+        .nav-arrow { background: none; border: none; color: rgba(255,255,255,0.3); font-size: 40px; cursor: pointer; padding: 20px; z-index: 20; transition: color 0.2s; user-select: none; }
+        .nav-arrow:active { color: var(--blue); }
+
         /* Eyes */
         .eye { width: 70px; height: 90px; background: var(--white); border-radius: 30px; margin: 0 30px; transition: height 0.2s, background 0.1s; position: relative; overflow: hidden; }
         .row { display: flex; align-items: center; justify-content: center; }
         
-        /* Pupils for looking left/right */
         .pupil { position: absolute; width: 40px; height: 50px; background: #000; border-radius: 50%; top: 20px; left: 15px; transition: transform 0.2s; visibility: hidden; }
         .looking .pupil { visibility: visible; }
 
@@ -57,32 +66,38 @@
 <body>
 
     <div id="controls">
-        <button onclick="initCompanion()">START COMPANION</button>
+        <button id="start-btn" onclick="initCompanion()">START COMPANION</button>
     </div>
 
-    <div id="stage">
-        <div id="face-idle" class="face active">
-            <div class="row">
-                <div id="l-eye" class="eye eye-left"><div class="pupil"></div></div>
-                <div id="r-eye" class="eye eye-right"><div class="pupil"></div></div>
+    <div id="container">
+        <button class="nav-arrow" onclick="cycleFace(-1)">&#10094;</button>
+
+        <div id="stage">
+            <div id="face-idle" class="face active">
+                <div class="row">
+                    <div id="l-eye" class="eye eye-left"><div class="pupil"></div></div>
+                    <div id="r-eye" class="eye eye-right"><div class="pupil"></div></div>
+                </div>
+                <div id="main-mouth" class="mouth">
+                    <div id="tongue" class="tongue"></div>
+                </div>
             </div>
-            <div id="main-mouth" class="mouth">
-                <div id="tongue" class="tongue"></div>
+
+            <div id="face-speed" class="face">
+                <div class="gauge"><div id="needle" class="needle"></div></div>
+                <div style="margin-top:10px; color:var(--red); font-weight:bold;">SLOW DOWN!</div>
+            </div>
+
+            <div id="face-brake" class="face">
+                <div class="row">
+                    <div class="angry-eye"></div>
+                    <div class="angry-eye right"></div>
+                </div>
+                <div class="mouth" style="border-bottom:none; border-top: 6px solid white; border-radius: 50%; height:10px;"></div>
             </div>
         </div>
 
-        <div id="face-speed" class="face">
-            <div class="gauge"><div id="needle" class="needle"></div></div>
-            <div style="margin-top:10px; color:var(--red); font-weight:bold;">SLOW DOWN!</div>
-        </div>
-
-        <div id="face-brake" class="face">
-            <div class="row">
-                <div class="angry-eye"></div>
-                <div class="angry-eye right"></div>
-            </div>
-            <div class="mouth" style="border-bottom:none; border-top: 6px solid white; border-radius: 50%; height:10px;"></div>
-        </div>
+        <button class="nav-arrow" onclick="cycleFace(1)">&#10095;</button>
     </div>
 
     <div id="stats">
@@ -93,7 +108,18 @@
 
     <script>
         let currentSpeed = 0, gForce = 0, tilt = 0, isAnimating = false, wakeLock = null;
-        let stationaryTimer = 0, isSleeping = false;
+        let stationaryTimer = 0, isSleeping = false, manualOverride = false;
+        
+        const faceIds = ['face-idle', 'face-speed', 'face-brake'];
+        let currentFaceIndex = 0;
+
+        function toggleFullscreen() {
+            let elem = document.documentElement;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (elem.requestFullscreen) { elem.requestFullscreen(); } 
+                else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+            }
+        }
 
         async function requestWakeLock() {
             try {
@@ -106,7 +132,10 @@
         }
 
         function initCompanion() {
+            toggleFullscreen();
+            document.getElementById('controls').style.display = 'none';
             requestWakeLock();
+            
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(res => { if (res == 'granted') startMotion(); });
             } else { startMotion(); }
@@ -117,6 +146,17 @@
             }, null, { enableHighAccuracy: true });
 
             scheduleNextAction();
+            update();
+        }
+
+        function cycleFace(dir) {
+            manualOverride = true;
+            currentFaceIndex = (currentFaceIndex + dir + faceIds.length) % faceIds.length;
+            switchFace(faceIds[currentFaceIndex]);
+            
+            // Release override after 5 seconds of no activity
+            clearTimeout(window.overrideTimeout);
+            window.overrideTimeout = setTimeout(() => { manualOverride = false; }, 5000);
         }
 
         function startMotion() {
@@ -139,66 +179,68 @@
             
             stage.style.transform = `rotate(${tilt}deg)`;
 
-            // Stationary/Sleep Logic
-            if (currentSpeed < 1) {
-                stationaryTimer++;
-                if (stationaryTimer > 600 && !isAnimating) {
-                    isSleeping = true;
-                    idleEyes.forEach(e => e.classList.add('sleepy'));
-                    statusMsg.innerText = "Zzz...";
-                }
-            } else {
-                // WAKE UP ANIMATION
-                if (isSleeping) {
-                    isSleeping = false;
+            // Logic handling (only if not manually scrolling)
+            if (!manualOverride) {
+                if (currentSpeed < 1) {
+                    stationaryTimer++;
+                    if (stationaryTimer > 600 && !isAnimating) {
+                        isSleeping = true;
+                        idleEyes.forEach(e => e.classList.add('sleepy'));
+                        statusMsg.innerText = "Zzz...";
+                    }
+                } else {
+                    if (isSleeping) {
+                        isSleeping = false;
+                        stationaryTimer = 0;
+                        isAnimating = true;
+                        statusMsg.innerText = "!";
+                        idleEyes.forEach(e => {
+                            e.classList.remove('sleepy');
+                            e.style.height = '110px';
+                        });
+                        setTimeout(() => {
+                            idleEyes.forEach(e => e.style.height = '90px');
+                            isAnimating = false;
+                            statusMsg.innerText = "AWAKE";
+                        }, 600);
+                    }
                     stationaryTimer = 0;
-                    isAnimating = true;
-                    statusMsg.innerText = "!";
-                    
-                    // Surprise pop open
-                    idleEyes.forEach(e => {
-                        e.classList.remove('sleepy');
-                        e.style.height = '110px'; // Extra wide
-                    });
-                    
-                    setTimeout(() => {
-                        idleEyes.forEach(e => e.style.height = '90px');
-                        isAnimating = false;
-                        statusMsg.innerText = "AWAKE";
-                    }, 600);
                 }
-                stationaryTimer = 0;
+
+                if (currentSpeed > 75) {
+                    switchFace('face-speed');
+                    currentFaceIndex = 1;
+                } else if (gForce < -5) {
+                    switchFace('face-brake');
+                    currentFaceIndex = 2;
+                } else {
+                    switchFace('face-idle');
+                    currentFaceIndex = 0;
+                }
             }
 
-            // Face Logic
-            if (currentSpeed > 75) {
-                switchFace('face-speed');
-                needle.style.transform = `rotate(${(currentSpeed * 1.5) - 100}deg)`;
-            } else if (gForce < -5) {
-                switchFace('face-brake');
-            } else {
-                switchFace('face-idle');
-                
-                if (!isAnimating && !isSleeping) {
-                    // Pupil tracking based on tilt
-                    if (tilt > 15) { 
-                        idleEyes.forEach(e => {
-                            e.classList.add('looking');
-                            e.querySelector('.pupil').style.transform = 'translateX(-20px)';
-                        });
-                    } else if (tilt < -15) { 
-                        idleEyes.forEach(e => {
-                            e.classList.add('looking');
-                            e.querySelector('.pupil').style.transform = 'translateX(20px)';
-                        });
-                    } else {
-                        idleEyes.forEach(e => {
-                            e.classList.remove('looking');
-                            e.querySelector('.pupil').style.transform = 'translateX(0)';
-                        });
-                    }
+            // Always update visual elements like needles or eye tracking
+            needle.style.transform = `rotate(${(currentSpeed * 1.5) - 100}deg)`;
+            
+            if (!isAnimating && !isSleeping && faceIds[currentFaceIndex] === 'face-idle') {
+                if (tilt > 15) { 
+                    idleEyes.forEach(e => {
+                        e.classList.add('looking');
+                        e.querySelector('.pupil').style.transform = 'translateX(-20px)';
+                    });
+                } else if (tilt < -15) { 
+                    idleEyes.forEach(e => {
+                        e.classList.add('looking');
+                        e.querySelector('.pupil').style.transform = 'translateX(20px)';
+                    });
+                } else {
+                    idleEyes.forEach(e => {
+                        e.classList.remove('looking');
+                        e.querySelector('.pupil').style.transform = 'translateX(0)';
+                    });
                 }
             }
+            
             requestAnimationFrame(update);
         }
 
@@ -216,7 +258,7 @@
 
         function performRandomAction() {
             const idleFace = document.getElementById('face-idle');
-            if (!idleFace.classList.contains('active') || isAnimating || isSleeping) {
+            if (!idleFace.classList.contains('active') || isAnimating || isSleeping || manualOverride) {
                 scheduleNextAction();
                 return;
             }
@@ -245,19 +287,15 @@
                     finishAction();
                 }, 1500);
             }
-            else if (rand < 0.40) { // ANGRY
+            else if (rand < 0.40) { // ANGRY FLASH
                 switchFace('face-brake');
                 setTimeout(() => {
-                    switchFace('face-idle');
+                    if (!manualOverride) switchFace('face-idle');
                     finishAction();
                 }, 1200);
             }
-            else if (rand < 0.60) { // DOUBLE BLINK
-                blink(() => blink(finishAction));
-            }
-            else { // BLINK
-                blink(finishAction);
-            }
+            else if (rand < 0.60) { blink(() => blink(finishAction)); }
+            else { blink(finishAction); }
         }
 
         function finishAction() {
@@ -274,7 +312,6 @@
             }, 100);
         }
 
-        update();
     </script>
 </body>
 </html>
