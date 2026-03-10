@@ -10,7 +10,7 @@
     <title>AI Car Companion - Ultimate Edition</title>
     <style>
         :root { --bg: #000; --white: #fff; --red: #ff4747; --blue: #77b5fe; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: manipulation; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: 'Courier New', Courier, monospace; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: manipulation; transition: background 0.2s; }
         
         #container { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 500px; }
         
@@ -18,49 +18,55 @@
         .face { display: none; flex-direction: column; align-items: center; }
         .active { display: flex; }
 
-        /* Navigation Arrows */
         .nav-arrow { background: none; border: none; color: rgba(255,255,255,0.3); font-size: 40px; cursor: pointer; padding: 20px; z-index: 20; transition: color 0.2s; user-select: none; }
         .nav-arrow:active { color: var(--blue); }
 
         /* Eyes */
-        .eye { width: 70px; height: 90px; background: var(--white); border-radius: 30px; margin: 0 30px; transition: height 0.2s, background 0.1s; position: relative; overflow: hidden; }
+        .eye { width: 70px; height: 90px; background: var(--white); border-radius: 30px; margin: 0 30px; transition: height 0.2s, background 0.3s; position: relative; overflow: hidden; }
         .row { display: flex; align-items: center; justify-content: center; }
         
-        .pupil { position: absolute; width: 40px; height: 50px; background: #000; border-radius: 50%; top: 20px; left: 15px; transition: transform 0.2s; visibility: hidden; }
+        .pupil { position: absolute; width: 0; height: 0; border-top: 25px solid transparent; border-bottom: 25px solid transparent; top: 20px; transition: transform 0.2s; visibility: hidden; }
+        .eye-left .pupil { border-right: 35px solid #000; left: 10px; }
+        .eye-right .pupil { border-left: 35px solid #000; right: 10px; }
         .looking .pupil { visibility: visible; }
 
-        /* Mouth & Tongue */
+        /* Scrunched Eyes (Used for >_<) */
+        .scrunched-container { width: 70px; height: 60px; position: relative; margin: 0 30px; }
+        .scrunched-container::before, .scrunched-container::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 10px; background: var(--white); border-radius: 5px; }
+        
+        /* Left Eye > */
+        .s-eye-left::before { transform: rotate(45deg); }
+        .s-eye-left::after { transform: rotate(-45deg); }
+        
+        /* Right Eye < */
+        .s-eye-right::before { transform: rotate(-45deg); }
+        .s-eye-right::after { transform: rotate(45deg); }
+
+        /* Mouths */
         .mouth { width: 50px; height: 20px; border-bottom: 6px solid var(--white); border-radius: 50%; margin-top: 30px; position: relative; transition: all 0.3s; }
-        .tongue { position: absolute; top: 15px; left: 10px; width: 30px; height: 0; background: var(--red); border-radius: 0 0 15px 15px; transition: height 0.2s cubic-bezier(0.17, 0.67, 0.6, 1.5); }
-        .tongue-out { height: 35px; }
+        .shock-mouth { width: 60px; height: 40px; border: 6px solid var(--white); border-radius: 40%; margin-top: 30px; }
 
-        /* Yawn / Open Mouth */
-        .yawn-mouth { width: 60px; height: 60px; border: 6px solid var(--white); border-radius: 50%; }
+        /* Gauge with Dynamic Glow */
+        .gauge { width: 240px; height: 240px; border: 4px solid var(--white); border-radius: 50%; position: relative; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
+        .needle { position: absolute; bottom: 50%; left: calc(50% - 2px); width: 4px; height: 100px; background: var(--red); transform-origin: bottom; transition: transform 0.2s; z-index: 5; border-radius: 2px; }
+        .speed-label { position: absolute; width: 30px; height: 20px; text-align: center; font-size: 14px; font-weight: bold; color: var(--white); transform: translate(-50%, -50%); transition: color 0.3s; }
 
-        /* Scrunched Eyes (><) */
-        .scrunched { background: transparent !important; height: 60px !important; }
-        .scrunched::before, .scrunched::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 8px; background: var(--white); border-radius: 4px; }
-        .eye-left.scrunched::before { transform: rotate(45deg); }
-        .eye-left.scrunched::after { transform: rotate(-45deg); }
-        .eye-right.scrunched::before { transform: rotate(-45deg); }
-        .eye-right.scrunched::after { transform: rotate(45deg); }
+        /* Background Flash */
+        .flash-red { background: #500 !important; }
 
-        /* Sleepy Eyes */
+        .danger-mode { border-color: var(--red); box-shadow: 0 0 25px var(--red); animation: pulse-red 1s infinite alternate; }
+        .danger-text { color: var(--red) !important; }
+
+        @keyframes pulse-red {
+            from { box-shadow: 0 0 10px var(--red); }
+            to { box-shadow: 0 0 30px var(--red); }
+        }
+
         .sleepy { height: 10px !important; }
 
-        /* Gauge */
-        .gauge { width: 200px; height: 200px; border: 5px solid var(--white); border-radius: 50%; position: relative; }
-        .needle { position: absolute; bottom: 50%; left: calc(50% - 2px); width: 4px; height: 90px; background: var(--red); transform-origin: bottom; transition: transform 0.2s; }
-
-        /* Angry Elements */
-        .angry-eye { width: 70px; height: 25px; background: var(--white); transform: rotate(20deg); border-radius: 5px; margin: 0 20px;}
-        .angry-eye.right { transform: rotate(-20deg); }
-
-        /* UI */
         #controls { position: absolute; top: 20px; width: 100%; display: flex; justify-content: center; }
         button { background: rgba(255,255,255,0.1); border: 1px solid #fff; color: #fff; padding: 12px 20px; border-radius: 8px; z-index: 10; font-weight: bold; cursor: pointer; }
         #stats { position: absolute; bottom: 20px; font-family: monospace; font-size: 12px; color: #666; text-align: center; width: 100%; }
-        #status-msg { color: var(--blue); font-size: 10px; margin-top: 5px; height: 12px; }
     </style>
 </head>
 <body>
@@ -75,25 +81,25 @@
         <div id="stage">
             <div id="face-idle" class="face active">
                 <div class="row">
-                    <div id="l-eye" class="eye eye-left"><div class="pupil"></div></div>
-                    <div id="r-eye" class="eye eye-right"><div class="pupil"></div></div>
+                    <div class="eye eye-left"><div class="pupil"></div></div>
+                    <div class="eye eye-right"><div class="pupil"></div></div>
                 </div>
-                <div id="main-mouth" class="mouth">
-                    <div id="tongue" class="tongue"></div>
+                <div class="mouth"></div>
+            </div>
+
+            <div id="face-stop" class="face">
+                <div class="row">
+                    <div class="scrunched-container s-eye-left"></div>
+                    <div class="scrunched-container s-eye-right"></div>
                 </div>
+                <div class="shock-mouth"></div>
             </div>
 
             <div id="face-speed" class="face">
-                <div class="gauge"><div id="needle" class="needle"></div></div>
-                <div style="margin-top:10px; color:var(--red); font-weight:bold;">SLOW DOWN!</div>
-            </div>
-
-            <div id="face-brake" class="face">
-                <div class="row">
-                    <div class="angry-eye"></div>
-                    <div class="angry-eye right"></div>
+                <div class="gauge" id="speed-gauge">
+                    <div id="needle" class="needle"></div>
                 </div>
-                <div class="mouth" style="border-bottom:none; border-top: 6px solid white; border-radius: 50%; height:10px;"></div>
+                <div style="margin-top:20px; color:var(--red); font-weight:bold;">SLOW DOWN!</div>
             </div>
         </div>
 
@@ -102,146 +108,60 @@
 
     <div id="stats">
         SPD: <span id="s-val">0</span> | G: <span id="g-val">0</span> | TILT: <span id="t-val">0</span>
-        <div id="status-msg">READY</div>
-        <div id="wake-status">SCREEN TIMEOUT: ALLOWED</div>
     </div>
 
     <script>
         let currentSpeed = 0, gForce = 0, tilt = 0, isAnimating = false, wakeLock = null;
-        let stationaryTimer = 0, isSleeping = false, manualOverride = false;
-        
-        const faceIds = ['face-idle', 'face-speed', 'face-brake'];
+        let manualOverride = false;
+        const faceIds = ['face-idle', 'face-stop', 'face-speed'];
         let currentFaceIndex = 0;
 
-        function toggleFullscreen() {
-            let elem = document.documentElement;
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                if (elem.requestFullscreen) { elem.requestFullscreen(); } 
-                else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+        function createSpeedLabels() {
+            const gauge = document.getElementById('speed-gauge');
+            for (let i = 0; i <= 140; i += 20) {
+                const label = document.createElement('div');
+                label.className = 'speed-label';
+                label.innerText = i;
+                const angle = 135 + (i / 140) * 270;
+                const rad = angle * (Math.PI / 180);
+                label.style.left = (120 + 95 * Math.cos(rad)) + 'px';
+                label.style.top = (120 + 95 * Math.sin(rad)) + 'px';
+                gauge.appendChild(label);
             }
         }
-
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    document.getElementById('wake-status').innerText = "SCREEN TIMEOUT: PREVENTED";
-                    document.getElementById('wake-status').style.color = "#77b5fe";
-                }
-            } catch (err) {}
-        }
+        createSpeedLabels();
 
         function initCompanion() {
-            toggleFullscreen();
             document.getElementById('controls').style.display = 'none';
-            requestWakeLock();
-            
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(res => { if (res == 'granted') startMotion(); });
             } else { startMotion(); }
-
+            
             navigator.geolocation.watchPosition((pos) => {
                 currentSpeed = (pos.coords.speed || 0) * 2.237; 
                 document.getElementById('s-val').innerText = Math.round(currentSpeed);
             }, null, { enableHighAccuracy: true });
 
-            scheduleNextAction();
             update();
+        }
+
+        function startMotion() {
+            window.addEventListener('devicemotion', (e) => {
+                let rawG = e.accelerationIncludingGravity ? e.accelerationIncludingGravity.y : 0;
+                gForce = rawG; // Tracking decel
+                document.getElementById('g-val').innerText = gForce.toFixed(2);
+                let rawTilt = e.accelerationIncludingGravity ? e.accelerationIncludingGravity.x : 0;
+                tilt = rawTilt * 5;
+                document.getElementById('t-val').innerText = Math.round(tilt);
+            });
         }
 
         function cycleFace(dir) {
             manualOverride = true;
             currentFaceIndex = (currentFaceIndex + dir + faceIds.length) % faceIds.length;
             switchFace(faceIds[currentFaceIndex]);
-            
-            // Release override after 5 seconds of no activity
             clearTimeout(window.overrideTimeout);
             window.overrideTimeout = setTimeout(() => { manualOverride = false; }, 5000);
-        }
-
-        function startMotion() {
-            window.addEventListener('devicemotion', (e) => {
-                let rawG = e.accelerationIncludingGravity ? e.accelerationIncludingGravity.y : 0;
-                gForce = Math.abs(rawG) < 1 ? 0 : rawG;
-                document.getElementById('g-val').innerText = gForce.toFixed(2);
-                
-                let rawTilt = e.accelerationIncludingGravity ? e.accelerationIncludingGravity.x : 0;
-                tilt = Math.abs(rawTilt) < 0.5 ? 0 : rawTilt * 5;
-                document.getElementById('t-val').innerText = Math.round(tilt);
-            });
-        }
-
-        function update() {
-            const stage = document.getElementById('stage');
-            const needle = document.getElementById('needle');
-            const idleEyes = eyes();
-            const statusMsg = document.getElementById('status-msg');
-            
-            stage.style.transform = `rotate(${tilt}deg)`;
-
-            // Logic handling (only if not manually scrolling)
-            if (!manualOverride) {
-                if (currentSpeed < 1) {
-                    stationaryTimer++;
-                    if (stationaryTimer > 600 && !isAnimating) {
-                        isSleeping = true;
-                        idleEyes.forEach(e => e.classList.add('sleepy'));
-                        statusMsg.innerText = "Zzz...";
-                    }
-                } else {
-                    if (isSleeping) {
-                        isSleeping = false;
-                        stationaryTimer = 0;
-                        isAnimating = true;
-                        statusMsg.innerText = "!";
-                        idleEyes.forEach(e => {
-                            e.classList.remove('sleepy');
-                            e.style.height = '110px';
-                        });
-                        setTimeout(() => {
-                            idleEyes.forEach(e => e.style.height = '90px');
-                            isAnimating = false;
-                            statusMsg.innerText = "AWAKE";
-                        }, 600);
-                    }
-                    stationaryTimer = 0;
-                }
-
-                if (currentSpeed > 75) {
-                    switchFace('face-speed');
-                    currentFaceIndex = 1;
-                } else if (gForce < -5) {
-                    switchFace('face-brake');
-                    currentFaceIndex = 2;
-                } else {
-                    switchFace('face-idle');
-                    currentFaceIndex = 0;
-                }
-            }
-
-            // Always update visual elements like needles or eye tracking
-            needle.style.transform = `rotate(${(currentSpeed * 1.5) - 100}deg)`;
-            
-            if (!isAnimating && !isSleeping && faceIds[currentFaceIndex] === 'face-idle') {
-                if (tilt > 15) { 
-                    idleEyes.forEach(e => {
-                        e.classList.add('looking');
-                        e.querySelector('.pupil').style.transform = 'translateX(-20px)';
-                    });
-                } else if (tilt < -15) { 
-                    idleEyes.forEach(e => {
-                        e.classList.add('looking');
-                        e.querySelector('.pupil').style.transform = 'translateX(20px)';
-                    });
-                } else {
-                    idleEyes.forEach(e => {
-                        e.classList.remove('looking');
-                        e.querySelector('.pupil').style.transform = 'translateX(0)';
-                    });
-                }
-            }
-            
-            requestAnimationFrame(update);
         }
 
         function switchFace(id) {
@@ -249,68 +169,47 @@
             document.getElementById(id).classList.add('active');
         }
 
-        function scheduleNextAction() {
-            const nextInterval = Math.floor(Math.random() * 5000) + 7000;
-            setTimeout(performRandomAction, nextInterval);
+        function update() {
+            const needle = document.getElementById('needle');
+            const gauge = document.getElementById('speed-gauge');
+            const stage = document.getElementById('stage');
+            
+            stage.style.transform = `rotate(${tilt}deg)`;
+
+            if (!manualOverride) {
+                // SUDDEN STOP DETECTION (G-force spike)
+                // Adjust -8 based on how sensitive you want the "braking" to be
+                if (gForce < -8) {
+                    switchFace('face-stop');
+                    document.body.classList.add('flash-red');
+                    setTimeout(() => document.body.classList.remove('flash-red'), 500);
+                } else if (currentSpeed > 75) {
+                    switchFace('face-speed');
+                } else {
+                    switchFace('face-idle');
+                }
+            }
+
+            // Update Needle
+            let needleAngle = -135 + (Math.min(currentSpeed, 140) / 140) * 270;
+            if(needle) needle.style.transform = `rotate(${needleAngle}deg)`;
+            
+            // Speedometer Glow
+            if (currentSpeed > 75) gauge.classList.add('danger-mode');
+            else gauge.classList.remove('danger-mode');
+
+            requestAnimationFrame(update);
         }
 
-        const eyes = () => document.querySelectorAll('#face-idle .eye');
-
-        function performRandomAction() {
+        // Automatic Blinking for Idle Face
+        setInterval(() => {
             const idleFace = document.getElementById('face-idle');
-            if (!idleFace.classList.contains('active') || isAnimating || isSleeping || manualOverride) {
-                scheduleNextAction();
-                return;
+            if(idleFace.classList.contains('active')) {
+                const eyes = idleFace.querySelectorAll('.eye');
+                eyes.forEach(e => e.style.height = '5px');
+                setTimeout(() => eyes.forEach(e => e.style.height = '90px'), 150);
             }
-
-            isAnimating = true;
-            const rand = Math.random();
-            const mouth = document.getElementById('main-mouth');
-            const tongue = document.getElementById('tongue');
-            const e = eyes();
-
-            if (rand < 0.15) { // YAWN
-                mouth.classList.add('yawn-mouth');
-                e.forEach(el => el.style.height = '40px');
-                setTimeout(() => {
-                    mouth.classList.remove('yawn-mouth');
-                    e.forEach(el => el.style.height = '90px');
-                    finishAction();
-                }, 2000);
-            } 
-            else if (rand < 0.30) { // TONGUE + ><
-                e.forEach(el => el.classList.add('scrunched'));
-                tongue.classList.add('tongue-out');
-                setTimeout(() => {
-                    e.forEach(el => el.classList.remove('scrunched'));
-                    tongue.classList.remove('tongue-out');
-                    finishAction();
-                }, 1500);
-            }
-            else if (rand < 0.40) { // ANGRY FLASH
-                switchFace('face-brake');
-                setTimeout(() => {
-                    if (!manualOverride) switchFace('face-idle');
-                    finishAction();
-                }, 1200);
-            }
-            else if (rand < 0.60) { blink(() => blink(finishAction)); }
-            else { blink(finishAction); }
-        }
-
-        function finishAction() {
-            isAnimating = false;
-            scheduleNextAction();
-        }
-
-        function blink(callback) {
-            if (isSleeping) return;
-            eyes().forEach(e => e.style.height = '5px');
-            setTimeout(() => {
-                eyes().forEach(e => e.style.height = '90px');
-                if (callback) setTimeout(callback, 100);
-            }, 100);
-        }
+        }, 4000);
 
     </script>
 </body>
